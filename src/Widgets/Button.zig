@@ -94,8 +94,10 @@ fn mouseOmniSignal(self:*PushButton,x:i32,y:i32,b:u32,ir:*do.IRender) void {
 fn draw(self:PushButton) void {
 	do.g8.fillBox(self.fb,0,0,self.nx,self.ny,if(self.hover) CLR_HOVER else CLR_BG);
 	do.g8.drawColors(self.fb,2,1);
-	do.g8.fillBox(self.fb,6,18,12,4,0x7);
-	do.g8.fillBox(self.fb,16,19,11,4,Sc);
+	do.g8.fillBox(self.fb,16,18,12,4,0x7);
+	do.g8.fillBox(self.fb,6,19,11,4,Sc);
+	do.g8.text(self.fb,8,24,do.g8.TRelRect{.x=13,.y=5,.nx=42,.ny=27},"BuTton",0x2F);
+
 }//draw
 
 // Main ----------------------------------------------------------------------

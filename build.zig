@@ -2,6 +2,7 @@
 //2023apr25:(VK) Created
 //2023may03:(VK)*v0.11 API
 //2023may09:(VK)+cache_root
+//2023jul22:(VK)+exe2=animatext
 
 // https://stackoverflow.com/questions/76206472/how-to-change-the-local-cache-directory-for-the-zig-build-system
 
@@ -22,17 +23,28 @@ pub fn build(b:*Builder) void {
 	});
 	//exe.valgrind_support=true;
 	exe.strip=false;
+	const exe2=b.addExecutable(.{
+		.name="animatext",
+		.root_source_file=.{.path="app/animatext.zig"},
+		.target=target,
+		.optimize=optimize,
+	});
+	exe2.strip=false;
 
 	const devos=b.addModule("DevOS",.{
 		.source_file=.{.path="src/DevOS.zig"},
 	});
 	exe.addModule("DevOS",devos);
+	exe2.addModule("DevOS",devos);
 	const run_cmd=exe.run();
 
 	const run_step=b.step("run","Run the app");
 	run_step.dependOn(&run_cmd.step);
 
-	b.default_step.dependOn(&exe.step);
+	b.default_step.dependOn(&exe2.step);
 	b.installArtifact(exe);
+	b.installArtifact(exe2);
 	//@import("std").debug.print("Hello! {}\nBye!", .{exe});
+	b.step("anib","build Text animation").dependOn(&exe2.step);
+	b.step("ani","Text animation demo").dependOn(&exe2.run().step);
 }//build

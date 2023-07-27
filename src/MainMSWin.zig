@@ -29,6 +29,10 @@ const HBRUSH=w.HBRUSH;
 const BOOL=w.BOOL;
 const WORD=w.WORD;
 const DWORD=w.DWORD;
+const TIMERPROC=switch (@import("builtin").zig_backend) {
+.stage1 => fn(param0:HWND,param1:u32,param2:usize,param3:u32) callconv(WINAPI) void,
+else => *const fn(param0:HWND,param1:u32,param2:usize,param3:u32) callconv(WINAPI) void,
+};
 
 // VARS
 //////////////////////////////////////////////////////////////////////////////
@@ -102,9 +106,10 @@ pub extern "gdi32" fn SetDIBitsToDevice(
 	ColorUse:DIB_USAGE,
 ) callconv(@import("std").os.windows.WINAPI) i32;
 
-//user32.zig
 pub extern "user32" fn InvalidateRect(hWnd:?HWND,lpRect:?*const RECT,bErase:BOOL) callconv(@import("std").os.windows.WINAPI) BOOL;
 pub extern "gdi32" fn CreateSolidBrush(color: u32) callconv(WINAPI) ?HBRUSH;
+pub extern "user32" fn SetTimer(hWnd:?HWND,nIDEvent:usize,uElapse:u32,lpTimerFunc:?TIMERPROC) callconv(WINAPI) usize;
+pub extern "user32" fn KillTimer(hWnd:?HWND,uIDEvent:usize) callconv(WINAPI) BOOL;
 
 //system/diagnostics/debug.zig
 pub extern "kernel32" fn Beep(dwFreq:u32,dwDuration:u32) callconv(WINAPI) BOOL;
@@ -250,8 +255,10 @@ pub export fn WindowProc(hwnd:HWND,uMsg:w.UINT,wParam:w.WPARAM,lParam:w.LPARAM,
 	const rw=@intToPtr(*IRender,@bitCast(usize,old));
 //std.debug.print("rw.w={} ", .{rw.w});
 	do.timer.signal();
+//		_=SetTimer(hwnd,0,1000,null);//10Hz
 	switch(uMsg){
-	user32.WM_GETMINMAXINFO=>{},
+//	user32.WM_GETMINMAXINFO=>{},
+	user32.WM_GETICON=>{_=SetTimer(hwnd,0,100,null);},//one-time at startup
 	user32.WM_SETCURSOR=>{},
 	user32.WM_MOVE=>{},
 	user32.WM_NCHITTEST=>{},
@@ -263,12 +270,15 @@ pub export fn WindowProc(hwnd:HWND,uMsg:w.UINT,wParam:w.WPARAM,lParam:w.LPARAM,
 	},//WM_LBUTTONDOWN
 	user32.WM_KEYDOWN=>{
 		const r=RECT{.left=8,.top=9,.right=1024+55,.bottom=888};
-		_=InvalidateRect(hwnd,&r,w.FALSE);
+		//16=SHIFT 82=R
+		if(82==wParam) _=InvalidateRect(hwnd,&r,w.FALSE);
 		std.debug.print("\x1b[44mKEY{},{}\x1b[40m ", .{wParam,lParam});
+		_=rw.keySignal(@intCast(i32,wParam));
 		return 0;
 	},//WM_KEYDOWN
 	user32.WM_KEYUP=>{
 		std.debug.print("\x1b[44mUP{}\x1b[40m ", .{wParam});
+		_=rw.keySignal(-@intCast(i32,wParam));
 		//do.say("up");
 		return 0;
 	},//WM_KEYUP
@@ -303,6 +313,7 @@ pub export fn WindowProc(hwnd:HWND,uMsg:w.UINT,wParam:w.WPARAM,lParam:w.LPARAM,
 		color%=31;
 		return 0;
 	},//WM_PAINT
+	user32.WM_TIMER=>{Log.trace("Timer",.{});_=SetTimer(hwnd,0,100,null);},
 	else=>{std.debug.print("WM{} ", .{uMsg});}
 	}//switch
 	return user32.DefWindowProcW(hwnd, uMsg, wParam, lParam);
@@ -330,6 +341,9 @@ hInstance,null);
 	Log.info("BBGGRR123456={x}!",.{CreateSolidBrush(0x123456).?});//0x00BBGGRR
 	if(hwnd) |window| {
 		if(false) _=user32.ShowWindow(window, nCmdShow);
+//		_=SetTimer(window,0,100,null);//10Hz, TODO: has no effect!!
+		const t=SetTimer(window,9,100,null);//10Hz
+		Log.msg("SetTimer={} ",.{t});
 		//_=window;
 		//_=nCmdShow;
 		//_=user32.MessageBoxW(window, u8to16le("hello"), u8to16le("title"), 0);
@@ -349,7 +363,10 @@ const gfb=do.GBuf{.p=&fb[0],.w=1024};
 	@memset(&fb[0],255,500);
 	@memset(&fb[3],0,500);
 
+	do.g8.startup();
+
 	@import("root").doMain();
+	Log.trace("back from doMain",.{});
 
 	var msg:user32.MSG=undefined;
 	while(user32.getMessageA(&msg,null,0,0))|_|{
@@ -379,7 +396,7 @@ null,null,SInstance,null) orelse unreachable;
 		return r;
 	}//new
 	fn renderOne(uhdc:usize,ctx:*anyopaque,clip:*[4]i32,ss:util.TSideSet,sw:*TStackWin) void {
-		Log.msg("MSWin.renderOne"); std.debug.print("clip={any} ",.{clip.*});
+		Log.msg("MSWin.renderOne clip={any} ",.{clip.*});
 		const hdc=@intToPtr(HDC,uhdc);//was ?HDC TODO:reject zero
 		const rect=@ptrCast(*RECT,clip);
 		_=ss;
@@ -387,9 +404,11 @@ null,null,SInstance,null) orelse unreachable;
 		switch(sw.t) {
 		.FREE,.GROUP,.NOTHING=>{},
 		.BAR=>{
-			rect.right+=rect.left;
-			rect.bottom+=rect.top;
-			_=FillRect(hdc,rect,@intToPtr(HBRUSH,color+1));//COLOR_WINDOW+1=COLOR_WINDOWFRAME=6 zero-doesn't-cast
+			rect.left=sw.x;
+			rect.right=sw.x+@intCast(i32,sw.w);
+			rect.top=sw.y;
+			rect.bottom=sw.y+@intCast(i32,sw.h);
+			_=FillRect(hdc,rect,CreateSolidBrush(@bitCast(u32,GPal[sw.clr])));//COLOR_WINDOW+1=COLOR_WINDOWFRAME=6 zero-doesn't-cast
 		},//BAR
 		.RECT=>{
 			rect.left=sw.x;
@@ -401,7 +420,7 @@ null,null,SInstance,null) orelse unreachable;
 			//TODO:DeleteObject(brush)
 		},//RECT
 		.BUF8=>|bw|{
-			Log.trace("BUF8",.{});
+			Log.trace("BUF8({},{},)",.{sw.x,sw.y});
 			const bwfb=bw.fb();
 			Gbmi.bmiHeader.biWidth=@bitCast(i32,sw.w);
 			Gbmi.bmiHeader.biHeight=-@bitCast(i32,sw.h);
