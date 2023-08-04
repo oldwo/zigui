@@ -31,14 +31,19 @@ pub inline fn signal() void {
 //	if(now<Snext) return;
 	Snext=std.math.maxInt(i64);
 	Log.blue("{}timers",.{list.items.len});
-	for(list.items,0..)|*sig,i|{
+	for(list.items)|*sig|{
 		if(sig.when>now) continue;
 		//Log.info("sig={}",.{sig});
 		if(!sig.f(sig.ctx,now) or 0==sig.next) {
-			_=list.swapRemove(i);//will miss last item this time
+			sig.when=0;//Shrinking the list mid-iteration crashes:_=list.swapRemove(i);//will miss last item this time
 		} else {sig.when+=sig.next;}//if
 		if(sig.when<Snext) Snext=sig.when;
 	}//for
+	var i=list.items.len;
+	while(i>0) {
+		i-=1;
+		if(0==list.items[i].when) _=list.swapRemove(i);
+	}//while
 }//signal
 
 /// next=0 means "no repeat", times in microseconds

@@ -16,7 +16,7 @@ pub fn build(b:*Builder) void {
 	const optimize=b.standardOptimizeOption(.{.preferred_optimize_mode=.ReleaseSmall,});
 	const exe=b.addExecutable(.{
 		.name="demo1",
-		.root_source_file=.{.path="app1/main.zig"},
+		.root_source_file=.{.path="app/pushbutton.zig"},
 		.target=target,
 		.optimize=optimize,
 //		.cache_root="I:\\zig",
@@ -30,12 +30,20 @@ pub fn build(b:*Builder) void {
 		.optimize=optimize,
 	});
 	exe2.strip=false;
+	const exe3=b.addExecutable(.{
+		.name="nesting",
+		.root_source_file=.{.path="app/nesting.zig"},
+		.target=target,
+		.optimize=optimize,
+	});
+	exe3.strip=false;
 
 	const devos=b.addModule("DevOS",.{
 		.source_file=.{.path="src/DevOS.zig"},
 	});
 	exe.addModule("DevOS",devos);
 	exe2.addModule("DevOS",devos);
+	exe3.addModule("DevOS",devos);
 	const run_cmd=exe.run();
 
 	const run_step=b.step("run","Run the app");
@@ -44,7 +52,9 @@ pub fn build(b:*Builder) void {
 	b.default_step.dependOn(&exe2.step);
 	b.installArtifact(exe);
 	b.installArtifact(exe2);
+	b.installArtifact(exe3);
 	//@import("std").debug.print("Hello! {}\nBye!", .{exe});
 	b.step("anib","build Text animation").dependOn(&exe2.step);
 	b.step("ani","Text animation demo").dependOn(&exe2.run().step);
+	b.step("nest","Nested renderers demo").dependOn(&exe3.run().step);
 }//build

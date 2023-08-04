@@ -3,6 +3,7 @@
 //2023jun04:(VK)+BUF8
 //2023jun15:(VK)+DRAW8
 //2023jun16:(VK)+TSignal
+//2023jul31:(VK)+wproc,PAINT
 
 // GAORA BHAKTA VINDA
 
@@ -42,6 +43,7 @@ pub const TSignal=union(enum) {
 	MOUSEUP:struct{x:i32,y:i32},
 	KEYDOWN:struct{k:i32,c:i8},
 	KEYUP:struct{k:i32},
+	PAINT:struct{},
 };//TSignal
 
 pub const TSignalF=fn(ctx:*anyopaque,signal:TSignal)isize;// !0=>consumed
@@ -55,7 +57,9 @@ z:u16=0,//do we need this? cached render order
 clr:u8,
 alpha:u8=255,
 t:TWin,
-
+wproc:?*const TSignalF,
+ctx:*anyopaque,
+	
 // VARS
 //////////////////////////////////////////////////////////////////////////////
 
@@ -67,11 +71,11 @@ pub inline fn pointInRect(x:i32,y:i32, left:i32,top:i32,w:u32,h:u32) bool {
 	return true;
 }//pointInRect
 pub inline fn Bar(x:i32,y:i32,w:u32,h:u32,clr:u8) SW {
-	return SW{.x=x,.y=y,.w=w,.h=h,.clr=clr,.t=TWin{.BAR={}}};
+	return SW{.x=x,.y=y,.w=w,.h=h,.clr=clr,.t=TWin{.BAR={}},.wproc=null,.ctx=@constCast(&h)};
 }//Bar
-pub inline fn Rect(x:i32,y:i32,w:u32,h:u32,clr:u8) SW {return SW{.x=x,.y=y,.w=w,.h=h,.clr=clr,.t=TWin{.RECT={}}};}
+pub inline fn Rect(x:i32,y:i32,w:u32,h:u32,clr:u8) SW {return SW{.x=x,.y=y,.w=w,.h=h,.clr=clr,.t=TWin{.RECT={}},.wproc=null,.ctx=@constCast(&h)};}
 pub inline fn Group(x:i32,y:i32,w:u32,h:u32,dx:u32,dy:u32) SW {
-	return SW{.x=x,.y=y,.w=w,.h=h,.clr=0,.t=TWin{.GROUP=.{
+	return SW{.x=x,.y=y,.w=w,.h=h,.clr=0,.wproc=null,.ctx=@constCast(&h),.t=TWin{.GROUP=.{
 		.dx=@intCast(i32,dx),
 		.dy=@intCast(i32,dy),
 		//.children=&[0]u16{},

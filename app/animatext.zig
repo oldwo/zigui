@@ -56,6 +56,7 @@ const cutr=do.g8.TRelRect{.x=95+bounce(Si,37),.y=1+bounce(Si,19),.nx=133,.ny=41}
 
 pub fn doMain() void {
 	var rs=do.OSwin(1280,640,"Animate Text");
+	rs.stack.appendNTimes(do.StackWin.Group(0,0,1280,640,0,0),7) catch unreachable;
 //	_=rs.addWin(3,@constCast(&do.Bar(4,88, 200,99, 255)));
 	var bw=do.BufWin.make(624,512);//(1024,512);
 	Log.trace("bw={*} will draw...",.{&bw});

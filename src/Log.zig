@@ -41,7 +41,9 @@ pub const val=logfn("\x1b[36m","\x1b[m ").print;
 pub const trace=logfn("\n\x1b[7m","\x1b[m").print;
 pub const begin=logfn("\n\x1b[91m","\x1b[m").print;
 pub const red=logfn("\x1b[31m","\x1b[m").print;
+pub const green=logfn("\x1b[92m","\x1b[m").print;
 pub const blue=logfn("\x1b[94m","\x1b[m").print;
+pub const pink=logfn("\x1b[95m","\x1b[m").print;
 pub const info=logfn("\x1b[36;4;7mi\x1b[27m","\x1b[24m\n").print;
 pub const single=logfn("\n\x1b[97m","\x1b[m").print;
 

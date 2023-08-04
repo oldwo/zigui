@@ -5,13 +5,15 @@
 //2023jul15:(VK)+CLR
 //2023jul18:(VK)+imgAX0
 //2023jul20:(VK)+text
-
+//2023jul30:(VK)+clipRect
+	
 //May this module render forms that remind living beings of the original source
 //of all names, forms, qualities and activities. This Supreme Creator is also
 //the Supreme Enjoyer, who shares His resources in order to increase enjoyment.
 
 const std=@import("std");
 const do=@import("DevOS.zig");
+const u=@import("Util.zig");
 
 // TYPES
 //////////////////////////////////////////////////////////////////////////////
@@ -69,6 +71,15 @@ pub fn fillBox(fb:do.GBuf,x:u32,y:u32,w:u32,h:u32,c:u8) void {
 	var p:[*]u8=fb.p.ptr+x+y*fb.w;
 	for(0..h)|_|{@memset(p,c,w);p+=fb.w;}
 }//fillBox
+
+pub fn clipRect(fb:do.GBuf,x:i32,y:i32,w:i32,h:i32,c:u8,ss:u.TSideSet) void {
+	std.debug.print("\x1b[95m;clipRect({},{} {},{}) ",.{x,y,w,h});
+	var p:[*]u8=fb.p.ptr+@intCast(usize,x)+@intCast(usize,y)*fb.w;
+	if(!ss.left) fillBox(fb,@intCast(u32,x),@intCast(u32,y),1,@intCast(u32,h),c);
+	if(!ss.right) fillBox(fb,@intCast(u32,x+w-1),@intCast(u32,y),1,@intCast(u32,h),c);
+	if(!ss.top) @memset(p,c,@intCast(u32,w));
+	if(!ss.bottom) @memset(p+@intCast(u32,h-1)*fb.w,c,@intCast(u32,w));
+}//clipRect
 
 pub fn img(fb:do.GBuf,x:u32,y:u32,ASource:*const u8,ASourceStep:i32,Anx:i32,Any:i32) void {
 	var pd:[*]u8=fb.p.ptr+x+y*fb.w;
