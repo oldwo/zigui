@@ -30,7 +30,7 @@ pub inline fn signal() void {
 	const now=std.time.microTimestamp();
 //	if(now<Snext) return;
 	Snext=std.math.maxInt(i64);
-	Log.blue("{}timers",.{list.items.len});
+	Log.blue("{}t",.{list.items.len});
 	for(list.items)|*sig|{
 		if(sig.when>now) continue;
 		//Log.info("sig={}",.{sig});

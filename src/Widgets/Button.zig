@@ -85,7 +85,7 @@ fn mouseSignal(self:*const PushButton,x:i32,y:i32,b:u32,ir:*do.IRender) void {
 	//_=self;
 }//mouseSignal
 fn mouseOmniSignal(self:*PushButton,x:i32,y:i32,b:u32,ir:*do.IRender) void {
-	std.debug.print("\x1b[93mPBmOuse: {},{}b{} nx={} ",.{x,y,b,self.nx});
+	std.debug.print("\x1b[93mPBmOuse: {},{}b{x} nx={} ",.{x,y,b,self.nx});
 	self.hover=0==(b&0x80);
 	self.draw();
 	ir.invalidateWin(self.h);

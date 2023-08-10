@@ -1,5 +1,6 @@
 ﻿//	Log.zig	- print debugging
 //2023jun03:(VK) Created
+//2023aug08:(VK)+not
 
 // MADHUSUDANAYA NAMAH
 
@@ -21,6 +22,7 @@ const expect=std.testing.expect;
 //////////////////////////////////////////////////////////////////////////////
 pub fn txt(t:[]const u8) void {std.debug.print("\x1b[43mL\x1b[m{s} ",.{t});}
 
+pub fn not(comptime fmt:[]const u8,args:anytype) void {_=fmt;_=args;}
 pub fn log(comptime fmt:[]const u8,args:anytype) void {
 	std.debug.print("\x1b[93m",.{});
 	std.debug.print(fmt,args);
@@ -40,10 +42,12 @@ pub const warn=logfn("\x1b[97;41m","\x1b[m\n").print;
 pub const val=logfn("\x1b[36m","\x1b[m ").print;
 pub const trace=logfn("\n\x1b[7m","\x1b[m").print;
 pub const begin=logfn("\n\x1b[91m","\x1b[m").print;
+pub const end=logfn("\x1b[37;44m","\x1b[m\n").print;
 pub const red=logfn("\x1b[31m","\x1b[m").print;
 pub const green=logfn("\x1b[92m","\x1b[m").print;
 pub const blue=logfn("\x1b[94m","\x1b[m").print;
 pub const pink=logfn("\x1b[95m","\x1b[m").print;
+pub const cyan=logfn("\x1b[96m","\x1b[m").print;
 pub const info=logfn("\x1b[36;4;7mi\x1b[27m","\x1b[24m\n").print;
 pub const single=logfn("\n\x1b[97m","\x1b[m").print;
 

@@ -9,7 +9,8 @@
 //2023jul23:(VK)+renderList
 //2023jul31:(VK)+setSignal
 //2023aug04:(VK)+Fhdc
-			
+//2023aug06:(VK)+move,*renderList->changeList
+
 //	May this module render forms that remind living beings of the original source
 //	of all names, forms, qualities and activities. This Supreme Creator is also
 //	the Supreme Enjoyer, who shares His resources in order to increase enjoyment.
@@ -19,7 +20,7 @@ const assert=std.debug.assert;
 
 const do=@import("DevOS.zig");
 const Log=@import("Log.zig");
-const RenderList=@import("NotifyList.zig").RenderChange;
+const ChangeList=@import("NotifyList.zig").RenderChange;
 const MouseList=@import("NotifyList.zig").MouseList;
 const g8=@import("Graph.zig");
 const u=@import("Util.zig");
@@ -29,7 +30,7 @@ const SGroup=@import("RenderStack/Group.zig");
 
 const IRender=@This();
 
-const FOCUS=0x80;
+pub const FOCUS:u32=0x80;
 const SERIES=0x40;//double click
 
 // FIELDS
@@ -41,12 +42,15 @@ stack:std.ArrayList(StackWin),
 stackZ:std.ArrayList(TZWin),
 w:u32,
 h:u32,
-renderList:RenderList,
+changeList:ChangeList,
 mouseList:MouseList,
 omniMouseList:MouseList,
 outdatedXYWH:[4]i32,
 timer:bool=false,
 Fhdc:usize,
+
+lastHover:u32,
+lastb:u32,
 	
 // VTABLE
 //////////////////////////////////////////////////////////////////////////////
@@ -60,7 +64,7 @@ pub const VTable=struct {
 //////////////////////////////////////////////////////////////////////////////
 pub const Tcallback=fn(a1:*const anyopaque,x:i32,y:i32,a2:u32,ir:*IRender)void;
 const TZWin=struct {
-	dx:i32,dy:i32,//includes clipxy offsets
+	dx:i32,dy:i32,//in renderWin
 	clipxynxy:[4]i32,//clipy:u32,clipnx:u32,clipny:u32,//absolute
 	h:u16,parent:u16,//index in stack
 	alpha:u8,
@@ -74,7 +78,7 @@ pub fn new(w:u32,h:u32,ctx:*anyopaque,vtable:*const VTable) *IRender {
 	ir.h=h;
 	ir.ctx=ctx;
 	ir.vtable=vtable;
-	ir.renderList=@TypeOf(ir.renderList).init(do.a);
+	ir.changeList=@TypeOf(ir.changeList).init(do.a);
 	ir.mouseList=@TypeOf(ir.mouseList).init(do.a);
 	ir.omniMouseList=@TypeOf(ir.omniMouseList).init(do.a);
 	ir.stack=@TypeOf(ir.stack).initCapacity(do.a,16) catch unreachable;
@@ -89,31 +93,51 @@ pub fn new(w:u32,h:u32,ctx:*anyopaque,vtable:*const VTable) *IRender {
 	return ir;
 }//new
 
-var lastHover:u32=undefined;
-var lastb:u32=0;
 ///returns true to stop further processing
-pub fn mouseSignal(ir:*IRender,x:i32,y:i32,b:u32) bool {
-	std.debug.print("\x1b[5;122hH\x1b[96mir={*}mouseSignal: {},{} {} ",.{&ir,x,y,b});
+pub fn mouseSignal(ir:*IRender,x:i32,y:i32,Ab:u32) bool {
+	//std.debug.print("\x1b[5;122hH\x1b[96mir={*}mouseSignal: {},{} {} ",.{&ir,x,y,b});
 	var nextHover:u32=std.math.maxInt(u32);
+	var b=Ab&0x7F;//clear FOCUS bit
 	var bb=b;
-	bb|=(lastb^b)<<16;
-	bb|=lastHover<<24;
+	bb|=(ir.lastb^b)<<16;
+	bb|=ir.lastHover<<24;
+	const mb=if(0==bb&0x7F0000) StackWin.TSignal.MOUSEMOVE else if(0<(ir.lastb<<16)&bb) StackWin.TSignal.MOUSEUP else StackWin.TSignal.MOUSEDOWN;
+	//Log.warn("mb={any}",.{mb});
+	for(ir.stackZ.items)|zw|{
+		var sw=&ir.stack.items[zw.h];
+		if(sw.wproc)|_|Log.green("IRmouse=>w[{}] ",.{zw.h});
+		if(sw.wproc)|proc| {
+			const m=StackWin.Tmouse{.x=x-zw.dx-sw.x,.y=y-zw.dy-sw.y,.b=@truncate(u8,b|if(u.pointInRect(x,y,sw.x,sw.y,sw.w,sw.h))FOCUS else 0)};
+			_=proc(sw,zw.h,switch(mb){
+				.MOUSEMOVE=>StackWin.TSignal{.MOUSEMOVE=m},
+				.MOUSEDOWN=>StackWin.TSignal{.MOUSEDOWN=m},
+				.MOUSEUP=>StackWin.TSignal{.MOUSEUP=m},
+				else=>unreachable
+			});
+		}//if
+	}//for
+	//Log.msg("{}mlist",.{ir.mouseList.l.items.len});
 	for(ir.mouseList.l.items)|it|{
 		//Log.val("mls{},{},{},{},",.{x,y,b,it});
 		//TODO:fill in focus byte
 		const sw=ir.stack.items[it.h];
-		if(u.pointInRect(x,y,sw.x,sw.y,sw.w,sw.h) and 0!=bb^it.Fxor&it.Fand) it.cb(it.ctx,x,y,bb,ir);
+		if(u.pointInRect(x,y,sw.x,sw.y,sw.w,sw.h) and 0!=bb^it.Fxor&it.Fand) {
+			Log.green("mList=>[{}] ",.{it.h});
+			it.cb(it.ctx,x,y,bb,ir);
+		}
 	}//for
+	//Log.msg("{}olist",.{ir.omniMouseList.l.items.len});
 	for(ir.omniMouseList.l.items)|it|{
 		const sw=ir.stack.items[it.h];
 		bb=if(u.pointInRect(x,y,sw.x,sw.y,sw.w,sw.h)) b else b|FOCUS;
 		if(0!=bb&FOCUS) nextHover=it.h;
-		if(lastHover!=nextHover) bb|=FOCUS<<16;
+		if(ir.lastHover!=nextHover) bb|=FOCUS<<16;
 		if(0==bb^it.Fxor&it.Fand)continue;
-		it.cb(it.ctx,x,y,bb|(lastHover<<24)|(nextHover<<8),ir);
+		Log.green("moList=>[{}] ",.{it.h});
+		it.cb(it.ctx,x,y,bb|(ir.lastHover<<24)|(nextHover<<8),ir);
 	}//for
-	lastHover=nextHover;
-	lastb=b&0xFF;
+	ir.lastHover=nextHover;
+	ir.lastb=b&0xFF;
 	return true;
 }//mouseSignal
 
@@ -128,23 +152,26 @@ pub fn render(ir:*IRender,hdc:usize,x:i32,y:i32,w:i32,h:i32) void {
 	Log.begin("IRender.render xywh={},{},{},{}",.{x,y,w,h});
 	if(0==ir.stackZ.items.len) ir.buildZ(0);
 //	_=x; _=y; _=w; _=h;
-	Log.red("...IRender.render...",.{});
 	for(ir.stackZ.items)|zw|{
 		var sw=&ir.stack.items[zw.h];
-		Log.txt("ZWin");
-		Log.log("zw={} sw={}",.{zw,sw});
+		//Log.log("zw={} sw={}",.{zw,sw});
 		//TStackWin *psw=pStack+pZwin[i].h;
 	//var TRelRect cl,abs;
 		//GetClipAbsRect(pZwin[i].h,&cl,NULL,&abs);
 		var clip:[4]i32=undefined;
-		Log.log("{}hp={},{} dxy={},{} clip={any}",.{sw.t,zw.h,zw.parent,zw.dx,zw.dy,clip});
+		Log.log("{}hp={},{} dxy={},{} zclip={any}",.{sw.t,zw.h,zw.parent,zw.dx,zw.dy,zw.clipxynxy});
 		Log.val("sw.xywh={},{}+{},{}",.{sw.x,sw.y,@intCast(i32,sw.w),@intCast(i32,sw.h)});
-		const ss=u.intersectRelRect(x,y,w,h,&[4]i32{sw.x,sw.y,@intCast(i32,sw.w),@intCast(i32,sw.h)},clip[0..]);
+		//const ss=u.intersectRelRect(x,y,w,h,&[4]i32{sw.x,sw.y,@intCast(i32,sw.w),@intCast(i32,sw.h)},clip[0..]);
+		_=u.intersectRelRect2(x,y,w,h,&zw.clipxynxy,clip[0..]);
+		Log.log("midclip={any}",.{clip});
+		const ss=u.intersectRelRect2(sw.x+zw.dx,sw.y+zw.dy,@intCast(i32,sw.w),@intCast(i32,sw.h),&clip,clip[0..]);
 		if(0==clip[2] or 0==clip[3]) continue;
-		if(sw.wproc)|proc| _=proc(sw.ctx,StackWin.TSignal{.PAINT=.{}});
+		if(sw.wproc)|proc| _=proc(sw,zw.h,StackWin.TSignal{.PAINT=.{}});
+		Log.log("postclip={any}",.{clip});
 		ir.vtable.renderOne(hdc,ir.ctx,&clip,ss,sw);
 	//if(0==clip[2] or 0==clip[3]) continue;
 	}//for
+	ir.changeList.signal(x,y,w,h,ir);
 }//render
 
 pub fn rerender(self:*IRender) void {
@@ -163,16 +190,18 @@ pub fn addWin(self:*IRender,p:u16,w:*StackWin) u16 {
 	return h;
 }//addWin
 
-pub fn addBuf8(self:*IRender,comptime T:type,p:u16,x:i32,y:i32,Abw:T) *T {
+pub fn addBuf8(self:*IRender,comptime T:type,p:u16,x:i32,y:i32,Abw:T,comptime subr:enum{alone,nest}) *T {
 	assert(.GROUP==self.stack.items[p].t);
 	var bw=do.a.create(T) catch unreachable; bw.*=Abw;
 	//Log.log("addBuf={}",.{bw});//prints the whole framebuffer
+	//this must be done before addWin=>setRender below, but after bw creation above!
+	if(.nest==subr) bw.subRender=IRender.new(bw.fb.w,bw.ny,bw,&T.vtable);
 //	self.stack.append(do.StackWin{.x=x+99,.y=y,.w=bw.fb.w,.h=bw.ny,.clr=0,.t=do.TWin{.BUF8=.{	.ctx=bw,.dfb=@offsetOf(T,"fb")	}}}) catch unreachable;
 	const i=@truncate(u16,self.stack.items.len);
 //	self.stack.items[i].p=p;
 	_=self.addWin(p,&do.StackWin{.x=x,.y=y,.w=bw.fb.w,.h=bw.ny,.clr=0,.t=do.TWin{.BUF8=.{
 		.ctx=bw,.dfb=@offsetOf(T,"fb")
-	}},.wproc=null,.ctx=bw});
+	}},.wproc=null});
 	bw.setRender(self,i);
 	//return i;//u16
 	return bw;
@@ -182,8 +211,8 @@ pub inline fn setSignal(self:*IRender,h:u16,wproc:*const StackWin.TSignalF) void
 	self.stack.items[h].wproc=wproc;
 }//setSignal
 
-pub inline fn addRender(self:*IRender,cb:*const RenderList.Tcallback,ctx:*anyopaque,h:u16) void {
-	self.renderList.add(cb,ctx,h);
+pub inline fn addChanger(self:*IRender,cb:*const ChangeList.Tcallback,ctx:*anyopaque,h:u16) void {
+	self.changeList.add(cb,ctx,h);
 }//addRender
 
 pub inline fn addMouser(self:*IRender,Axor:u32,Aand:u32,cb:*const Tcallback,ctx:*anyopaque,h:u16) void {
@@ -193,6 +222,17 @@ pub inline fn addMouser(self:*IRender,Axor:u32,Aand:u32,cb:*const Tcallback,ctx:
 pub inline fn addOmniMouser(self:*IRender,Axor:u32,Aand:u32,cb:*const Tcallback,ctx:*anyopaque,h:u16) void {
 	self.omniMouseList.add(Axor,Aand,cb,ctx,h);
 }//addOmniMouser
+
+///ctx is the big one, Air-the nested one, sending this signal
+pub fn cbChange(ctx:*anyopaque,H:u16,x:i32,y:i32,w:i32,h:i32,Air:*IRender) void {
+	const ir=@ptrCast(*IRender,@alignCast(8,ctx));
+	const sw=ir.stack.items[H];
+	ir.invalidate(sw.x+x,sw.y+y,w,h);
+	Log.trace("cbChange",.{});
+	//_=H;
+	_=Air;//subRender,sender
+	//_=x;_=y;_=w;_=h;
+}//cbChange
 
 pub fn invalidate(self:*IRender,x:i32,y:i32,w:i32,h:i32) void {
 	Log.begin("IRender.invalidate({},{},{},{}) outdatedXYWH{any}",.{x,y,w,h,self.outdatedXYWH});
@@ -224,6 +264,14 @@ pub fn invalidateWin(self:*IRender,h:u16) void {
 	self.invalidate(sw.x,sw.y,@intCast(i32,sw.w),@intCast(i32,sw.h));
 }//invalidateWin
 
+pub inline fn move(self:*IRender,h:u16,x:i32,y:i32) void {
+	self.invalidateWin(h);
+	self.stack.items[h].x=x;
+	self.stack.items[h].y=y;
+	self.invalidateWin(h);
+	self.spoilZ();
+}//move
+
 // PRIVATE -------------------------------------------------------------------
 fn buildZ(self:*IRender,Ah:u16) void {
 //very simple, if pZwin contains only parent context
@@ -243,7 +291,7 @@ fn buildZ(self:*IRender,Ah:u16) void {
 	}//if
 	//GROUP needs one potential next: if(nZwin+1>=maxZwin) {pZwin=(TZWin*)mustrealloc(pZwin,sizeof(*pZwin)*(maxZwin+=maxStack>>2));}//if
 	//pZwin[nZwin].h=Ah;
-	Log.log("Ah={}t={}",.{Ah,self.stack.items[Ah].t});
+	//Log.log("Ah={}t={}",.{Ah,self.stack.items[Ah].t});
 	switch(self.stack.items[Ah].t) {
 	.GROUP=>|gg|{
 		//var g=&self.stack.items[Ah];

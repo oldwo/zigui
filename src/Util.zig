@@ -37,7 +37,7 @@ pub inline fn pointInRectu(x:u32,y:u32, left:u32,top:u32,w:u32,h:u32) bool {
 
 pub fn intersectRelRect(x:i32,y:i32,w:i32,h:i32,fig:[*]const i32,dst:[*]i32) TSideSet {//returns clipped sides of fig
 //const int *Asrc1,const int *Asrc2,int *Adst) TSideSet {//x_y_nx_ny
-	Log.blue("intersectRelRect({},{},{},{},fig{any})",.{x,y,w,h,fig[0..4]});
+//	Log.blue("intersectRelRect({},{},{},{},fig{any})",.{x,y,w,h,fig[0..4]});
 	var result=TSideSet{.left=false,.right=false,.top=false,.bottom=false};
 	dst[0]=if(x<fig[0]) fig[0] else r:{result.left=true;break:r x;};//rightmost
 	const x1=x+@intCast(i32,w);//1-right
@@ -49,6 +49,25 @@ pub fn intersectRelRect(x:i32,y:i32,w:i32,h:i32,fig:[*]const i32,dst:[*]i32) TSi
 	const y1=y+@intCast(i32,h);//1-bottom
 	const y2=fig[1]+fig[3];//2-bottom
 	dst[3]=(if(y1<=y2) y1 else r:{result.bottom=true; break :r y2;})-dst[1];
+	if(dst[3]<0) dst[3]=0;
+	return result;
+}//intersectRelRect
+
+///xywh is figure, returns visible sides
+pub fn intersectRelRect2(x:i32,y:i32,w:i32,h:i32,clip:[*]const i32,dst:[*]i32) TSideSet {
+//const int *Asrc1,const int *Asrc2,int *Adst) TSideSet {//x_y_nx_ny
+	Log.blue("intersectRelRect2(fig{},{},{},{},clip{},{},{},{})",.{x,y,w,h,clip[0],clip[1],clip[2],clip[3]});
+	var result=TSideSet{.left=false,.right=false,.top=false,.bottom=false};
+	const xf=x+w;//fig-right
+	const xc=clip[0]+clip[2];//clip-right
+	dst[0]=if(x<clip[0]) clip[0] else r:{result.left=true;break:r x;};//rightmost
+	dst[2]=(if(xc<xf) xc else r:{result.right=true; break :r xf;})-dst[0];
+	if(dst[2]<0) dst[2]=0;
+
+	const yf=y+h;//fig-bottom
+	const yc=clip[1]+clip[3];//clip-bottom
+	dst[1]=if(y<clip[1]) clip[1] else r:{result.top=true;break:r y;};//lowest
+	dst[3]=(if(yc<yf) yc else r:{result.bottom=true; break :r yf;})-dst[1];
 	if(dst[3]<0) dst[3]=0;
 	return result;
 }//intersectRelRect

@@ -302,7 +302,7 @@ pub export fn WindowProc(hwnd:HWND,uMsg:w.UINT,wParam:w.WPARAM,lParam:w.LPARAM,
 .biClrImportant=0,
 		},.bmiColors=GPal,//undefined,//=[1]RGBQUAD{.{55,99,199,128}},
 };
-		std.debug.print("PainT hdc={} c={} ",.{hdc,color});
+		Log.cyan("PainT hdc={} c={} ",.{hdc,color});
 //		_=FillRect(hdc,&ps.rcPaint,@intToPtr(HBRUSH,color+1));//COLOR_WINDOW+1=COLOR_WINDOWFRAME=6 zero-doesn't-cast
 		rw.render(@ptrToInt(hdc),ps.rcPaint.left,ps.rcPaint.top,ps.rcPaint.right,ps.rcPaint.bottom);
 		const rc=SetDIBitsToDevice(hdc, 22,3,10+2+4,768, 0,0, 0,768, &fb,&bmi,DIB_USAGE.RGB_COLORS);
@@ -313,7 +313,7 @@ pub export fn WindowProc(hwnd:HWND,uMsg:w.UINT,wParam:w.WPARAM,lParam:w.LPARAM,
 		color%=31;
 		return 0;
 	},//WM_PAINT
-	user32.WM_TIMER=>{Log.trace("Timer",.{});_=SetTimer(hwnd,0,100,null);},
+	user32.WM_TIMER=>{Log.not("Timer",.{});_=SetTimer(hwnd,0,100,null);},
 	else=>{std.debug.print("WM{} ", .{uMsg});}
 	}//switch
 	return user32.DefWindowProcW(hwnd, uMsg, wParam, lParam);

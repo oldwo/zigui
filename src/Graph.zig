@@ -75,10 +75,10 @@ pub fn fillBox(fb:do.GBuf,x:u32,y:u32,w:u32,h:u32,c:u8) void {
 pub fn clipRect(fb:do.GBuf,x:i32,y:i32,w:i32,h:i32,c:u8,ss:u.TSideSet) void {
 	std.debug.print("\x1b[95m;clipRect({},{} {},{}) ",.{x,y,w,h});
 	var p:[*]u8=fb.p.ptr+@intCast(usize,x)+@intCast(usize,y)*fb.w;
-	if(!ss.left) fillBox(fb,@intCast(u32,x),@intCast(u32,y),1,@intCast(u32,h),c);
-	if(!ss.right) fillBox(fb,@intCast(u32,x+w-1),@intCast(u32,y),1,@intCast(u32,h),c);
-	if(!ss.top) @memset(p,c,@intCast(u32,w));
-	if(!ss.bottom) @memset(p+@intCast(u32,h-1)*fb.w,c,@intCast(u32,w));
+	if(ss.left) fillBox(fb,@intCast(u32,x),@intCast(u32,y),1,@intCast(u32,h),c);
+	if(ss.right) fillBox(fb,@intCast(u32,x+w-1),@intCast(u32,y),1,@intCast(u32,h),c);
+	if(ss.top) @memset(p,c,@intCast(u32,w));
+	if(ss.bottom) @memset(p+@intCast(u32,h-1)*fb.w,c,@intCast(u32,w));
 }//clipRect
 
 pub fn img(fb:do.GBuf,x:u32,y:u32,ASource:*const u8,ASourceStep:i32,Anx:i32,Any:i32) void {

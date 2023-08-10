@@ -11,6 +11,7 @@ const testing=std.testing;
 const Allocator=std.mem.Allocator;
 
 const do=@import("DevOS.zig");
+const Log=do.Log;
 
 // FUNCTIONS
 //////////////////////////////////////////////////////////////////////////////
@@ -64,7 +65,7 @@ pub const RenderChange=struct {
 const Self=@This();
 //const Tcallback=do.IRender.Tcallback;
 //fn(a1:*const anyopaque,x:i32,y:i32,b:u32)void;
-pub const Tcallback=fn(a1:*const anyopaque,x:i32,y:i32,a2:u32,ir:*do.IRender)void;
+pub const Tcallback=fn(ctx:*anyopaque,h:u16,x:i32,y:i32,nx:i32,ny:i32,ir:*do.IRender)void;
 const Titem=struct {
 	cb:*const Tcallback,
 	ctx:*anyopaque,
@@ -83,11 +84,10 @@ pub fn del(self:*Self,cb:*const Tcallback,ctx:*anyopaque,h:u16) void {
 		if(it.ctx==ctx and it.cb==cb and it.h==h) _=self.l.swapRemove(i);
 	}//for
 }//del
-pub fn signal(self:*const Self,x:i32,y:i32,b:u32) void {
-	std.debug.print("\x1b[5;122hH\x1b[96mNL/mouse: {},{}b{} ",.{x,y,b});
+pub fn signal(self:*const Self,x:i32,y:i32,nx:i32,ny:i32,ir:*do.IRender) void {
+	Log.msg("RenderChange",.{});
 	for(self.l.items)|it|{
-		if(0==b^it.Fxor&it.Fand)continue;
-		it.cb(it.ctx,x,y,b);
+		it.cb(it.ctx,it.h,x,y,nx,ny,ir);
 	}//for
 }//signal
 };//RenderChange

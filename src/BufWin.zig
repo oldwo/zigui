@@ -3,6 +3,7 @@
 //2023jun04:(VK)+IRender
 //2023jul28:(VK)+asIRender
 //2023jul31:(VK)+subRender
+//2023aug06:(VK)+addChanger
 	
 //	May this module render forms that remind living beings of the original source
 //	of all names, forms, qualities and activities. This Supreme Creator is also
@@ -25,6 +26,9 @@ ny:u32,
 fb:do.GBuf,
 subRender:?*IRender,
 
+///for subRender
+pub const vtable=.{.renderOne=renderOne,.invalidate=invalidate};
+
 // TYPES
 //////////////////////////////////////////////////////////////////////////////
 
@@ -39,20 +43,23 @@ pub fn make(w:u32,h:u32) BufWin {//returns value, on stack or optimized
 	};//BufWin
 }//make
 pub fn setRender(self:*BufWin,ir:*do.IRender,h:u16) void {
-	_=self;
+	//_=self;
 	//_=ir;//.bufWin=bw;	_=h;
 	ir.setSignal(h,signal);
 	//self.h=h;
 	//ir.addMouser(0x00,0xFF,@ptrCast(*const do.IRender.Tcallback,&mouseSignal),self,h);
 	//ir.addOmniMouser(0,0x800000,@ptrCast(*const do.IRender.Tcallback,&mouseOmniSignal),self,h);
 // fn addRender(self:*IRender,cb:*const RenderList.Tcallback,ctx:*anyopaque,h:u16)
+	if(self.subRender)|sr|{
+		sr.addChanger(IRender.cbChange,ir,h);
+	}//if
 }//setRender
 pub fn unsetRender(self:*BufWin,ir:*do.IRender) void {
 	_=self;_=ir;
 }//unsetRender
 
 pub fn asRender(bw:*BufWin) *do.IRender {
-	if(bw.subRender)|r| return r else
+	if(bw.subRender)|r| return r else unreachable;
 	bw.subRender=IRender.new(bw.fb.w,bw.ny,bw,&.{.renderOne=renderOne,.invalidate=invalidate});
 	Log.trace("BufWin={*}'IR={*}",.{bw,bw.subRender.?});
 	//subscribe events?
@@ -99,16 +106,18 @@ fn invalidate(ctx:*anyopaque,x:i32,y:i32,w:i32,h:i32) void {
 	}//if
 }//invalidate
 
-fn signal(ctx:*anyopaque,Asignal:do.StackWin.TSignal) isize {// !0=>consumed
-	const self=@ptrCast(*BufWin,@alignCast(8,ctx));
-	switch(Asignal){
-	.PAINT=>if(self.subRender)|sr|{
-		Log.trace("subRender",.{});
-		sr.rerender();
-	},//DRAW8
+fn signal(sw:*do.StackWin,h:u16,Asignal:do.StackWin.TSignal) isize {// !0=>consumed
+	_=h;
+	const self=@ptrCast(*BufWin,@alignCast(8,sw.t.BUF8.ctx));
+	const sr=self.subRender orelse return 0;
+	return if(switch(Asignal){
+	.PAINT=>{sr.rerender();return 0;},
+	.MOUSEMOVE=>|m|sr.mouseSignal(m.x,m.y,m.b),
+	.MOUSEDOWN=>|m|sr.mouseSignal(m.x,m.y,m.b),
+	.MOUSEUP=>|m|sr.mouseSignal(m.x,m.y,m.b),
 	else =>unreachable,
 	}//switch
-	return 0;
+	) 1 else 0;//if consumed
 }//signal
 
 // TESTS
